@@ -15,3 +15,31 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 } 
+/* iPhone Duo などのノッチ・ホームインジケーターを避ける余白 */
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+}
+
+.fab {
+  right: calc(1.5rem + env(safe-area-inset-right));
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+.modal-backdrop {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* 折り目の位置を取得できるブラウザでは、折り目の幅だけ列間を空ける */
+@media (horizontal-viewport-segments: 2) {
+  .memo-spread {
+    column-gap: calc(
+      env(viewport-segment-left 1 0) - env(viewport-segment-right 0 0) + 3rem
+    );
+  }
+}

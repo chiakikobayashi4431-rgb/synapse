@@ -1,7 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, RefreshCw, Link, X, BookOpen, User } from 'lucide-react';
 
-const API_URL = 'http://localhost:4000/api/memos';
+// 実機（iPhone Duo など）から開いたときも、ページを配信しているPCのAPIサーバーに接続する
+const API_URL = process.env.REACT_APP_API_URL ||
+  `${window.location.protocol}//${window.location.hostname}:4000/api/memos`;
+
+// これ以上横に指を動かしたらページ送りとみなす距離（px）
+const SWIPE_THRESHOLD = 50;
 
 const MemoApp = () => {
   const [memos, setMemos] = useState([]);
@@ -15,6 +20,7 @@ const MemoApp = () => {
   const [newMemoType, setNewMemoType] = useState('personal');
   const [newMemoSource, setNewMemoSource] = useState('');
   const [showSourceDetail, setShowSourceDetail] = useState(null);
+  const touchStart = useRef(null);
 
   const memosPerPage = 2;
   const totalPages = Math.ceil(memos.length / memosPerPage);
@@ -104,6 +110,26 @@ const MemoApp = () => {
     setShowAddForm(true);
   };
 
+  // 左右スワイプでページ送り（本をめくる操作）
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStart.current) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStart.current.x;
+    const dy = touch.clientY - touchStart.current.y;
+    touchStart.current = null;
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0 && currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1);
+    } else if (dx > 0 && currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   const getLinkedMemo = (linkedToId) => {
     return memos.find(memo => memo.id === linkedToId);
   };
@@ -116,12 +142,16 @@ const MemoApp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="app-shell bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">メモアプリ</h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center fold:text-2xl fold:mb-4">メモアプリ</h1>
         {loading && <div className="text-center text-gray-500 mb-4">Loading...</div>}
-        {/* メモ表示エリア */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* メモ表示エリア（折りたたみ端末を開くと左右の画面に1つずつ表示） */}
+        <div
+          className="memo-spread grid grid-cols-1 fold:grid-cols-2 gap-6 fold:gap-x-12 mb-8 fold:mb-4"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           {currentMemos.map((memo) => (
             <div
               key={memo.id}
@@ -140,17 +170,17 @@ const MemoApp = () => {
                   )}
                   <span className="text-gray-500">{memo.createdAt.toLocaleString('ja-JP')}</span>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex -m-2">
                   <button
                     onClick={() => startLinkingMode(memo.id)}
-                    className="text-blue-500 hover:text-blue-700 transition-colors"
+                    className="p-2 text-blue-500 hover:text-blue-700 transition-colors"
                     title="このメモにリンクした新しいメモを作成"
                   >
                     <Link size={16} />
                   </button>
                   <button
                     onClick={() => deleteMemo(memo.id)}
-                    className="text-red-500 hover:text-red-700 transition-colors"
+                    className="p-2 text-red-500 hover:text-red-700 transition-colors"
                     title="メモを削除"
                   >
                     <X size={16} />
@@ -238,8 +268,8 @@ const MemoApp = () => {
 
         {/* メモ追加フォーム */}
         {showAddForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90dvh] overflow-y-auto">
               <h3 className="text-lg font-semibold mb-4">
                 {linkingToBothMemos ? '2つのメモをリンクした新しいメモを追加' : 
                  linkingToMemo ? 'リンク付きメモを追加' : '新しいメモを追加'}
@@ -338,15 +368,16 @@ const MemoApp = () => {
         {/* 右下の追加ボタン */}
         <button
           onClick={() => setShowAddForm(true)}
-          className="fixed bottom-6 right-6 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition-colors hover:scale-110 transform"
+          title="新しいメモを追加"
+          className="fab fixed bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition-colors hover:scale-110 transform"
         >
           <Plus size={24} />
         </button>
 
         {/* メモ詳細モーダル */}
         {detailMemo && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 relative">
+          <div className="modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90dvh] overflow-y-auto relative">
               <button
                 onClick={() => setDetailMemo(null)}
                 className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
@@ -394,8 +425,8 @@ const MemoApp = () => {
 
         {/* 引用元詳細モーダル */}
         {showSourceDetail && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-xs mx-4 relative">
+          <div className="modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-xs mx-4 max-h-[90dvh] overflow-y-auto relative">
               <button
                 onClick={() => setShowSourceDetail(null)}
                 className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
